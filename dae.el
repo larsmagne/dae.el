@@ -28,14 +28,14 @@
 (require 'scan)
 
 (defvar dae-cdrom "/dev/addonics%d"
-  "CD-ROM device.)
+  "CD-ROM device.")
 
 (defvar dae-directory "/stage/"
   "Base directory where extracted files will be stored.")
 
 (defvar dae-this-cd-process nil)
 
-(defvar gnus-dead-summary-mode-map
+(defvar dae-mode-map
   (let ((map (make-keymap)))
     (suppress-keymap map)
     (define-key map "1" 'dae-read-audio-cd-1)
@@ -64,11 +64,17 @@
 (defun dae-read-audio-cd (cdrom)
   (let* ((data (dae-anonymous-read-audio-cd cdrom))
 	 (dir (car data))
-	 (frames (cdr data))
-	 id cat file max id-file result)
-    (setq id (cdr (assq 'id frames)))
-    (setq result (cddb-query frames)
-	  file (car result))
+	 (frames (nth 1 data))
+	 id cat max id-file result)
+    (setq id (cdr (assq 'id frames))
+	  file (expand-file-name "id" dir)
+	  result (cddb-query frames))
+    (setq cat (car result)
+	  result (cdr result))
+    (when result
+      (with-current-buffer result
+	(write-region (point-min) (point-max) file
+		      nil 'silent)))
     ;; No result from freedb -- query MusicBrainz.  cdda2wav puts the
     ;; MusicBrainz CD id into the "audio.inf" file, so look for it
     ;; there.
@@ -79,22 +85,20 @@
 	(when (re-search-forward "CDINDEX_DISCID=.*'\\([^']+\\)'" nil t)
 	  (let ((xml (musicbrainz-query (match-string 1))))
 	    (when xml
-	      (setq result (musicbrainz-to-cddb xml)))))))
+	      (setq result (musicbrainz-to-cddb xml))
+	      (cddb-write-file file result))))))
     ;; If we didn't get a result from the data bases, we look for the
     ;; audio.cddb file.  If the CD has the track names stored on disc
     ;; ("CD TEXT"), we'll find them there.
     (let ((cddb (expand-file-name "audio.cddb" dir)))
       (when (and (null result)
 		 (file-exists-p cddb))
-	(setq result (list cddb (cddb-parse cddb))
-	      file cddb)))
-    (if (and file
+	(setq result (cddb-parse cddb))
+	(cddb-write-file file result)))
+    (if (and (file-exists-p file)
 	     (y-or-n-p (format "The cd is %s? " (cddb-parse file 'title))))
-	(progn
-	  (cddb-edit (cddb-merge (cddb-parse file) frames)
-		     (cdr result))
-	  (when (and nil (equal (system-name) "potato.gnus.org"))
-	    (cddb-submit)))
+	(cddb-edit (cddb-merge (cddb-parse file) frames)
+		   cat)
       (let* ((artist (read-string "Artist: "))
 	     (alist (dae-grep-cddb artist))
 	     (album (completing-read "Album: " alist))
@@ -103,7 +107,7 @@
 	(if did
 	    (cddb-edit
 	     (cddb-merge (cddb-parse (concat "/mnt/cddb/" did)) frames)
-	     (cdr result))
+	     cat)
 	  (cddb-edit
 	   `((artist . ,artist)
 	     (title . ,album)
@@ -113,6 +117,8 @@
 	     (let ((file (concat ,dir "id"))
 		   (process ,(nth 2 data)))
 	       (write-region (point-min) (point-max) file)
+	       (dae-ensure-directory
+		(expand-file-name "data/new-cdda" dae-directory))
 	       (write-region (point-min) (point-max)
 			     (concat dae-directory "data/new-cdda/"
 				     ,id))
@@ -125,13 +131,13 @@
   "Read an anonymous audio CD."
   (interactive)
   (let (id frames dir process)
-    (setq frames (dae-read-frames)
+    (setq frames (cddb-get-toc-with-discid cdrom)
 	  id (cdr (assq 'id frames)))
     (setq dir (concat dae-directory "anonymous/" id "/"))
     (dae-ensure-directory dir)
     (setq process (dae-start-cdda dir cdrom))
     (scan-sleeve dir)
-    (cons file frames process)))
+    (list dir frames process)))
 
 (defun dae-start-cdda (dir cdrom)
   (let* ((default-directory dir)
@@ -148,7 +154,9 @@
      `(lambda (process change)
 	(when (file-exists-p (expand-file-name "id" ,dir))
 	  (dae-rename-raw ,dir))
-	(dae-eject ,cdrom)))))
+	;;(dae-eject ,cdrom)
+	))
+    process))
 
 (defun dae-rename-raw (dir)
   (when (file-exists-p (expand-file-name "id" dir))
@@ -158,10 +166,14 @@
 	   (i 1))
       (unless (string= (cddb-parse id 'title) "")
 	(while tracks
-	  (rename-file
-	   (format "audio_%02d.wav" i)
-	   (format "%02d-%s.wav" i
-		   (dae-quote (pop tracks))))
+	  (when (file-exists-p (format "audio_%02d.wav" i))
+	    (rename-file
+	     (format "audio_%02d.wav" i)
+	     (format "%02d-%s.wav" i
+		     (dae-quote (pop tracks)))
+	     t))
+	  (when (file-exists-p (format "audio_%02d.inf" i))
+	    (delete-file (format "audio_%02d.inf" i)))
 	  (incf i))
 	(let ((target-dir 
 	       (expand-file-name (concat (dae-quote (cddb-parse id 'artist))
@@ -172,7 +184,8 @@
 	  (dolist (file (directory-files dir t))
 	    (when (file-regular-p file)
 	      (rename-file file (expand-file-name (file-name-nondirectory file)
-						  target-dir))))
+						  target-dir)
+			   t)))
 	  (with-temp-file (expand-file-name "stats" target-dir)
 	    (insert (format
 		     "Artist: %s\nTitle: %s\nSource: cd\nCDDB: %s\nYear: %s\nTime: %s\n\n"
@@ -190,6 +203,10 @@
   (while (string-match "/" name)
     (setq name (replace-match "-" nil t name)))
   name)
+
+(defun dae-eject (cdrom)
+  "Eject a CD."
+  (start-process "*sh*" nil "eject" cdrom))
 
 (provide 'dae)
 
