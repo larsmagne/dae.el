@@ -159,8 +159,7 @@
      `(lambda (process change)
 	(when (file-exists-p (expand-file-name "id" ,dir))
 	  (dae-rename-raw ,dir))
-	;;(dae-eject ,cdrom)
-	))
+	(dae-eject ,cdrom)))
     process))
 
 (defun dae-rename-raw (dir)
