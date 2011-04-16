@@ -33,8 +33,6 @@
 (defvar dae-directory "/stage/"
   "Base directory where extracted files will be stored.")
 
-(defvar dae-this-cd-process nil)
-
 (defvar dae-mode-map
   (let ((map (make-keymap)))
     (suppress-keymap map)
