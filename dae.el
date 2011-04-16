@@ -120,13 +120,16 @@
     (setq cddb-submit-hook
 	  `(lambda ()
 	     (let ((file (concat ,dir "id"))
-		   (process ,(nth 2 data)))
+		   (process ,(nth 2 data))
+		   (toc ',(nth 3 data)))
 	       (write-region (point-min) (point-max) file)
 	       (dae-ensure-directory
 		(expand-file-name "data/new-cdda" dae-directory))
 	       (write-region (point-min) (point-max)
 			     (concat dae-directory "data/new-cdda/"
 				     ,id))
+	       (when toc
+		 (musicbrainz-possibly-submit toc (cddb-parse file)))
 	       (when (or (not process)
 			 (not (memq (process-status process)
 				    '(open run))))
@@ -135,14 +138,15 @@
 (defun dae-anonymous-read-audio-cd (cdrom)
   "Read an anonymous audio CD."
   (interactive)
-  (let (id frames dir process)
+  (let (id frames dir process toc)
     (setq frames (cddb-toc cdrom)
+	  toc (musicbrainz-toc cdrom)
 	  id (cdr (assq 'id frames)))
     (setq dir (concat dae-directory "anonymous/" id "/"))
     (dae-ensure-directory dir)
     (setq process (dae-start-cdda dir cdrom))
     (scan-sleeve dir)
-    (list dir frames process)))
+    (list dir frames process toc)))
 
 (defun dae-start-cdda (dir cdrom)
   (let* ((default-directory dir)
