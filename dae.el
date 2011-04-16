@@ -23,9 +23,16 @@
 
 ;;; Commentary:
 
+;; This library provides an interface for ripping, scanning and
+;; querying/editing cddb/musicbrainz entries in parallell.  The
+;; parallellism requires that you have several CD ROM players.
+
+;;; Code:
+
 (require 'cl)
 (require 'cddb)
 (require 'scan)
+(require 'musicbrainz)
 
 (defvar dae-cdrom "/dev/addonics%d"
   "CD-ROM device.")
