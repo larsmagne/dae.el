@@ -136,7 +136,7 @@
   "Read an anonymous audio CD."
   (interactive)
   (let (id frames dir process)
-    (setq frames (cddb-get-toc-with-discid cdrom)
+    (setq frames (cddb-toc cdrom)
 	  id (cdr (assq 'id frames)))
     (setq dir (concat dae-directory "anonymous/" id "/"))
     (dae-ensure-directory dir)
