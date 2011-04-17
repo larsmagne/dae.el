@@ -41,15 +41,15 @@
   "Base directory where extracted files will be stored.")
 
 (defvar dae-mode-map
-  (let ((map (make-keymap)))
-    (suppress-keymap map)
+  (let ((map (make-sparse-keymap)))
     (define-key map "1" 'dae-read-audio-cd-1)
     (define-key map "2" 'dae-read-audio-cd-2)
-    (define-key map "3" 'dae-read-audio-cd-3)))
+    (define-key map "3" 'dae-read-audio-cd-3)
+    map))
 
 (define-minor-mode dae-mode
   "Minor mode for Digital Audio Extraction."
-  :lighter " DAE" :keymap dae-mode-map)
+  :lighter " DAE" :keymap dae-mode-map nil)
 
 (defun dae-read-audio-cd-1 ()
   (interactive)
