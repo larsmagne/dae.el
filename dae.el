@@ -72,30 +72,29 @@
 	 (frames (nth 1 data))
 	 id cat max id-file result)
     (setq id (cdr (assq 'id frames))
-	  file (expand-file-name "id" dir)
+	  file "/tmp/id"
 	  result (cddb-query frames))
     (setq cat (car result)
 	  result (cdr result))
+    (when (file-exists-p file)
+      (delete-file file))
     (when result
       (with-current-buffer result
 	(write-region (point-min) (point-max) file
 		      nil 'silent)))
-    ;; No result from freedb -- query MusicBrainz.  cdda2wav puts the
-    ;; MusicBrainz CD id into the "audio.inf" file, so look for it
-    ;; there.
+    ;; No result from freedb -- query MusicBrainz.
     (unless result
-      (with-temp-buffer
-	(insert-file-contents (expand-file-name "audio.inf" dir))
-	(goto-char (point-min))
-	(when (re-search-forward "CDINDEX_DISCID=.*'\\([^']+\\)'" nil t)
-	  (let ((xml (musicbrainz-query (match-string 1))))
-	    (when xml
-	      (setq result (musicbrainz-to-cddb xml))
+      (let ((mb-id (cdr (assq 'id (nth 3 data)))))
+	(message "Querying MusicBrainz (%s)..." mb-id)
+	(let ((xml (musicbrainz-query mb-id)))
+	  (when xml
+	    (when (setq result (musicbrainz-to-cddb xml))
 	      (cddb-write-file file result))))))
     ;; If we didn't get a result from the data bases, we look for the
     ;; audio.cddb file.  If the CD has the track names stored on disc
     ;; ("CD TEXT"), we'll find them there.
     (let ((cddb (expand-file-name "audio.cddb" dir)))
+      (message "Looking for CD TXT...")
       (when (and (null result)
 		 (file-exists-p cddb))
 	(setq result (cddb-parse cddb))
@@ -183,6 +182,9 @@
 	  (when (file-exists-p (format "audio_%02d.inf" i))
 	    (delete-file (format "audio_%02d.inf" i)))
 	  (incf i))
+	(dolist (file '("audio.cddb" "audio.cdindex"))
+	  (when (file-exists-p (expand-file-name file) dir)
+	    (delete-file (expand-file-name file))))
 	(let ((target-dir 
 	       (expand-file-name (concat (dae-quote (cddb-parse id 'artist))
 					 "/"
@@ -194,6 +196,7 @@
 	      (rename-file file (expand-file-name (file-name-nondirectory file)
 						  target-dir)
 			   t)))
+	  (delete-directory dir)
 	  (with-temp-file (expand-file-name "stats" target-dir)
 	    (insert (format
 		     "Artist: %s\nTitle: %s\nSource: cd\nCDDB: %s\nYear: %s\nTime: %s\n\n"
