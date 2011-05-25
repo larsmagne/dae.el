@@ -70,7 +70,7 @@
   (let* ((data (dae-anonymous-read-audio-cd cdrom))
 	 (dir (car data))
 	 (frames (nth 1 data))
-	 id cat max id-file result)
+	 id cat max id-file result confirmed)
     (setq id (cdr (assq 'id frames))
 	  file "/tmp/id"
 	  result (cddb-query frames))
@@ -81,7 +81,11 @@
     (when result
       (with-current-buffer result
 	(write-region (point-min) (point-max) file
-		      nil 'silent)))
+		      nil 'silent))
+      (unless (setq confirmed
+		    (y-or-n-p (format "The cd is %s? "
+				      (cddb-parse file 'title))))
+	(setq result nil)))
     ;; No result from freedb -- query MusicBrainz.
     (unless result
       (let ((mb-id (cdr (assq 'id (nth 3 data)))))
@@ -100,17 +104,19 @@
 	(setq result (cddb-parse cddb))
 	(cddb-write-file file result)))
     (if (and (file-exists-p file)
-	     (y-or-n-p (format "The cd is %s? " (cddb-parse file 'title))))
+	     (or confirmed
+		 (y-or-n-p (format "The cd is %s? " (cddb-parse file 'title)))))
 	(cddb-edit (cddb-merge (cddb-parse file) frames)
 		   cat)
       (let* ((artist (read-string "Artist: "))
-	     (alist (dae-grep-cddb artist))
+	     (alist (cddb-grep artist))
 	     (album (completing-read "Album: " alist))
 	     (did (cdr (assoc album alist)))
 	     names)
 	(if did
 	    (cddb-edit
-	     (cddb-merge (cddb-parse (concat "/mnt/cddb/" did)) frames)
+	     (cddb-merge (cddb-parse (expand-file-name did cddb-directory))
+			 frames)
 	     cat)
 	  (cddb-edit
 	   `((artist . ,artist)
@@ -123,9 +129,9 @@
 		   (toc ',(nth 3 data)))
 	       (write-region (point-min) (point-max) file)
 	       (dae-ensure-directory
-		(expand-file-name "data/new-cdda" dae-directory))
+		(expand-file-name "new-cdda" dae-directory))
 	       (write-region (point-min) (point-max)
-			     (concat dae-directory "data/new-cdda/"
+			     (concat dae-directory "new-cdda/"
 				     ,id))
 	       (when toc
 		 (musicbrainz-possibly-submit toc (cddb-parse file)))
@@ -154,8 +160,8 @@
 	   "*sample*" (get-buffer-create " *cdda2wav*")
 	   "xterm"
 	   "-e"
-	   "cdda2wav"
-	   "-v" "all"
+	   "icedax"
+	   "-v" "toc,titles"
 	   "-B" (concat "-D" cdrom))))
     (set-process-sentinel
      process
@@ -183,7 +189,7 @@
 	    (delete-file (format "audio_%02d.inf" i)))
 	  (incf i))
 	(dolist (file '("audio.cddb" "audio.cdindex"))
-	  (when (file-exists-p (expand-file-name file) dir)
+	  (when (file-exists-p (expand-file-name file dir))
 	    (delete-file (expand-file-name file))))
 	(let ((target-dir 
 	       (expand-file-name (concat (dae-quote (cddb-parse id 'artist))
