@@ -204,6 +204,7 @@
 			   t)))
 	  (delete-directory dir)
 	  (with-temp-file (expand-file-name "stats" target-dir)
+	    (setq id (expand-file-name "id" target-dir))
 	    (insert (format
 		     "Artist: %s\nTitle: %s\nSource: cd\nCDDB: %s\nYear: %s\nTime: %s\n\n"
 		     (cddb-parse id 'artist)
