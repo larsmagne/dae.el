@@ -183,11 +183,12 @@
 	    (rename-file
 	     (format "audio_%02d.wav" i)
 	     (format "%02d-%s.wav" i
-		     (dae-quote (pop tracks)))
+		     (dae-quote (car tracks)))
 	     t))
 	  (when (file-exists-p (format "audio_%02d.inf" i))
 	    (delete-file (format "audio_%02d.inf" i)))
-	  (incf i))
+	  (incf i)
+	  (pop tracks))
 	(dolist (file '("audio.cddb" "audio.cdindex"))
 	  (when (file-exists-p (expand-file-name file dir))
 	    (delete-file (expand-file-name file))))
