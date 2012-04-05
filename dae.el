@@ -160,6 +160,7 @@
 
 (defun dae-start-cdda (dir cdrom)
   (let* ((default-directory dir)
+	 (start-time (float-time (current-time)))
 	 (process
 	  (start-process
 	   "*sample*" (get-buffer-create " *cdda2wav*")
@@ -171,10 +172,9 @@
     (set-process-sentinel
      process
      `(lambda (process change)
-	(let ((start-time (float-time (current-time))))
-	  (when (file-exists-p (expand-file-name "id" ,dir))
-	    (dae-report-time start-time ,dir)
-	    (dae-rename-raw ,dir)))
+	(when (file-exists-p (expand-file-name "id" ,dir))
+	  (dae-report-time ,start-time ,dir)
+	  (dae-rename-raw ,dir))
 	(dae-eject ,cdrom)))
     process))
 
