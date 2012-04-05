@@ -45,6 +45,7 @@
     (define-key map "1" 'dae-read-audio-cd-1)
     (define-key map "2" 'dae-read-audio-cd-2)
     (define-key map "3" 'dae-read-audio-cd-3)
+    (define-key map "9" 'dae-read-audio-audio-sr0)
     map))
 
 (define-minor-mode dae-mode
@@ -62,6 +63,10 @@
 (defun dae-read-audio-cd-3 ()
   (interactive)
   (dae-read-numbered-cdrom 3))
+
+(defun dae-read-audio-sr0 ()
+  (interactive)
+  (dae-read-audio-cd "/dev/sr0"))
 
 (defun dae-read-numbered-cdrom (number)
   (dae-read-audio-cd (format dae-cdrom number)))
@@ -166,10 +171,23 @@
     (set-process-sentinel
      process
      `(lambda (process change)
-	(when (file-exists-p (expand-file-name "id" ,dir))
-	  (dae-rename-raw ,dir))
+	(let ((start-time (float-time (current-time))))
+	  (when (file-exists-p (expand-file-name "id" ,dir))
+	    (dae-report-time start-time ,dir)
+	    (dae-rename-raw ,dir)))
 	(dae-eject ,cdrom)))
     process))
+
+(defun dae-report-time (start-time dir)
+  (let ((size 0)
+	(elapsed (- (float-time (current-time))
+		    start-time)))
+    (dolist (file (directory-files dir t "\\.wav$"))
+      (incf size (nth 7 (file-attributes file))))
+    (message "Extracted in %02d:%02d (%.1f%% speedup)"
+	     (truncate (/ elapsed 60))
+	     (mod elapsed 60)
+	     (/ size (* 44100 2 2) elapsed))))
 
 (defun dae-rename-raw (dir)
   (when (file-exists-p (expand-file-name "id" dir))
