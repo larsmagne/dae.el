@@ -184,7 +184,7 @@
 		    start-time)))
     (dolist (file (directory-files dir t "\\.wav$"))
       (incf size (nth 7 (file-attributes file))))
-    (message "Extracted in %02d:%02d (%.1f%% speedup)"
+    (message "Extracted in %02d:%02d (%.1fx speedup)"
 	     (truncate (/ elapsed 60))
 	     (mod elapsed 60)
 	     (/ size (* 44100 2 2) elapsed))))
