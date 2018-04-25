@@ -45,6 +45,7 @@
     (define-key map "1" 'dae-read-audio-cd-1)
     (define-key map "2" 'dae-read-audio-cd-2)
     (define-key map "3" 'dae-read-audio-cd-3)
+    (define-key map "4" 'dae-read-audio-cd-4)
     (define-key map "9" 'dae-read-audio-audio-sr0)
     map))
 
@@ -63,6 +64,10 @@
 (defun dae-read-audio-cd-3 ()
   (interactive)
   (dae-read-numbered-cdrom 3))
+
+(defun dae-read-audio-cd-4 ()
+  (interactive)
+  (dae-read-numbered-cdrom 4))
 
 (defun dae-read-audio-sr0 ()
   (interactive)
@@ -92,7 +97,8 @@
 				      (cddb-parse file 'title))))
 	(setq result nil)))
     ;; No result from freedb -- query MusicBrainz.
-    (unless result
+    (when (and nil
+	       (not result))
       (let ((mb-id (cdr (assq 'id (nth 3 data)))))
 	(message "Querying MusicBrainz (%s)..." mb-id)
 	(let ((xml (musicbrainz-query mb-id)))
@@ -138,7 +144,8 @@
 	       (write-region (point-min) (point-max)
 			     (concat dae-directory "new-cdda/"
 				     ,id))
-	       (when toc
+	       (when (and nil
+			  toc)
 		 (musicbrainz-possibly-submit toc (cddb-parse file)))
 	       (when (or (not process)
 			 (not (memq (process-status process)
@@ -167,6 +174,7 @@
 	   "xterm"
 	   "-e"
 	   "icedax"
+	   ;;"-paranoia"
 	   "-v" "toc,titles"
 	   "-B" (concat "-D" cdrom))))
     (set-process-sentinel
