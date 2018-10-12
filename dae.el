@@ -236,7 +236,7 @@
 		     "Artist: %s\nTitle: %s\nSource: cd\nCDDB: %s\nYear: %s\nTime: %s\n\n"
 		     (cddb-parse id 'artist)
 		     (cddb-parse id 'title)
-		     (cddb-parse id 'cddb)
+		     (cddb-parse id 'id)
 		     (or (cddb-parse id 'year) "")
 		     (format-time-string "%Y%m%dT%H%M%S")))))))))
 
