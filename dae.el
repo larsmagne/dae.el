@@ -83,7 +83,7 @@
 	 id cat max id-file result confirmed)
     (setq id (cdr (assq 'id frames))
 	  file "/tmp/id"
-	  result (cddb-query frames))
+	  result (and nil (cddb-query frames)))
     (setq cat (car result)
 	  result (cdr result))
     (when (file-exists-p file)
@@ -93,7 +93,8 @@
 	(write-region (point-min) (point-max) file
 		      nil 'silent))
       (unless (setq confirmed
-		    (y-or-n-p (format "The cd is %s? "
+		    (y-or-n-p (format "The cd is %s/%s? "
+				      (cddb-parse file 'artist)
 				      (cddb-parse file 'title))))
 	(setq result nil)))
     ;; No result from freedb -- query MusicBrainz.
@@ -116,7 +117,9 @@
 	(cddb-write-file file result)))
     (if (and (file-exists-p file)
 	     (or confirmed
-		 (y-or-n-p (format "The cd is %s? " (cddb-parse file 'title)))))
+		 (y-or-n-p (format "The cd is %s/%s? "
+				   (cddb-parse file 'artist)
+				   (cddb-parse file 'title)))))
 	(cddb-edit (cddb-merge (cddb-parse file) frames)
 		   cat)
       (let* ((artist (read-string "Artist: "))
@@ -186,6 +189,28 @@
 	(dae-eject ,cdrom)))
     process))
 
+(defun dae-start-cdda (dir cdrom)
+  (let* ((default-directory dir)
+	 (start-time (float-time (current-time)))
+	 process)
+    (call-process "icedax" nil (get-buffer-create " *cdda2wav*") nil
+		  "-v" "toc,titles"
+		  "-J" (concat "-D" cdrom))
+    (setq process
+	  (start-process
+	   "*sample*" (get-buffer-create " *cdda2wav*")
+	   "xterm" "-e" "cdparanoia"
+	   "-Z"
+	   "-B" "-d" cdrom))
+    (set-process-sentinel
+     process
+     `(lambda (process change)
+	(when (file-exists-p (expand-file-name "id" ,dir))
+	  (dae-report-time ,start-time ,dir)
+	  (dae-rename-raw ,dir))
+	(dae-eject ,cdrom)))
+    process))
+
 (defun dae-report-time (start-time dir)
   (let ((size 0)
 	(elapsed (- (float-time (current-time))
@@ -198,6 +223,12 @@
 	     (/ size (* 44100 2 2) elapsed))))
 
 (defun dae-rename-raw (dir)
+  ;; If we're using cdparanoia, rename the files first.
+  (dolist (file (directory-files dir t "track[0-9]+.cdda.wav$"))
+    (rename-file file (replace-regexp-in-string
+		       "track\\([0-9]+\\).cdda.wav$"
+		       "audio_\\1.wav"
+		       file)))
   (when (file-exists-p (expand-file-name "id" dir))
     (let* ((default-directory dir)
 	   (id (concat dir "id"))
