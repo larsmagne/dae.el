@@ -216,7 +216,7 @@
 	(elapsed (- (float-time (current-time))
 		    start-time)))
     (dolist (file (directory-files dir t "\\.wav$"))
-      (incf size (nth 7 (file-attributes file))))
+      (cl-incf size (nth 7 (file-attributes file))))
     (message "Extracted in %02d:%02d (%.1fx speedup)"
 	     (truncate (/ elapsed 60))
 	     (mod elapsed 60)
@@ -244,7 +244,7 @@
 	     t))
 	  (when (file-exists-p (format "audio_%02d.inf" i))
 	    (delete-file (format "audio_%02d.inf" i)))
-	  (incf i)
+	  (cl-incf i)
 	  (pop tracks))
 	(dolist (file '("audio.cddb" "audio.cdindex"))
 	  (when (file-exists-p (expand-file-name file dir))
