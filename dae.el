@@ -29,7 +29,6 @@
 
 ;;; Code:
 
-(require 'cl)
 (require 'cddb)
 (require 'scan)
 (require 'musicbrainz)
@@ -80,7 +79,8 @@
   (let* ((data (dae-anonymous-read-audio-cd cdrom))
 	 (dir (car data))
 	 (frames (nth 1 data))
-	 id cat max id-file result confirmed)
+	 id cat max id-file result confirmed
+	 file)
     (setq id (cdr (assq 'id frames))
 	  file "/tmp/id"
 	  result (and nil (cddb-query frames)))
