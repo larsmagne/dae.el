@@ -80,6 +80,9 @@
 		" / " "/" (replace-regexp-in-string "\\\\'" "'" string))))
 
 (defun dae-possibly-get-titles (cdrom)
+  ;; icedax writes a cddb file automatically, and we pick that up.
+  ;; But if it's a Various album, the group info isn't in that cddb
+  ;; file, so we have to parse this alternative output.
   (with-temp-buffer
     (call-process "icedax" nil t nil
 		  "-J" "-g" "-v" "toc,titles" "-B" "-D" cdrom)
