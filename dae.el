@@ -52,13 +52,13 @@
   "Minor mode for Digital Audio Extraction."
   :lighter " DAE" :keymap dae-mode-map nil)
 
-(defun dae-read-audio-cd-1 ()
-  (interactive)
-  (dae-read-numbered-cdrom 1))
+(defun dae-read-audio-cd-1 (&optional paranoid)
+  (interactive "P")
+  (dae-read-numbered-cdrom 1 paranoid))
 
-(defun dae-read-audio-cd-2 ()
-  (interactive)
-  (dae-read-numbered-cdrom 2))
+(defun dae-read-audio-cd-2 (&optional paranoid)
+  (interactive "P")
+  (dae-read-numbered-cdrom 2 paranoid))
 
 (defun dae-read-audio-cd-3 ()
   (interactive)
@@ -72,11 +72,32 @@
   (interactive)
   (dae-read-audio-cd "/dev/sr0"))
 
-(defun dae-read-numbered-cdrom (number)
-  (dae-read-audio-cd (format dae-cdrom number)))
+(defun dae-read-numbered-cdrom (number &optional paranoid)
+  (dae-read-audio-cd (format dae-cdrom number) paranoid))
 
-(defun dae-read-audio-cd (cdrom)
-  (let* ((data (dae-anonymous-read-audio-cd cdrom))
+(defun dae-clean-title (string)
+  (string-trim (replace-regexp-in-string
+		" / " "/" (replace-regexp-in-string "\\\\'" "'" string))))
+
+(defun dae-possibly-get-titles (cdrom)
+  (with-temp-buffer
+    (call-process "icedax" nil t nil
+		  "-J" "-g" "-v" "toc,titles" "-B" "-D" cdrom)
+    (goto-char (point-min))
+    (let ((titles nil))
+      (while (re-search-forward "title '\\(.*\\)' from '\\(.*\\)'$"
+				nil t)
+	(let ((track (match-string 1))
+	      (group (match-string 2)))
+	  (push (concat (dae-clean-title group) " / "
+			(dae-clean-title track))
+		titles)))
+      (and titles
+	   (list (cons 'tracks (nreverse titles)))))))
+
+(defun dae-read-audio-cd (cdrom &optional paranoid)
+  (let* ((titles (dae-possibly-get-titles cdrom))
+	 (data (dae-anonymous-read-audio-cd cdrom paranoid))
 	 (dir (car data))
 	 (frames (nth 1 data))
 	 id cat max id-file result confirmed
@@ -120,7 +141,7 @@
 		 (y-or-n-p (format "The cd is %s/%s? "
 				   (cddb-parse file 'artist)
 				   (cddb-parse file 'title)))))
-	(cddb-edit (cddb-merge (cddb-parse file) frames)
+	(cddb-edit (cddb-merge (or titles (cddb-parse file)) frames)
 		   cat)
       (let* ((artist (read-string "Artist: "))
 	     (alist (cddb-grep artist))
@@ -155,7 +176,7 @@
 				    '(open run))))
 		 (dae-rename-raw ,dir)))))))
 
-(defun dae-anonymous-read-audio-cd (cdrom)
+(defun dae-anonymous-read-audio-cd (cdrom &optional paranoid)
   "Read an anonymous audio CD."
   (interactive)
   (let (id frames dir process toc)
@@ -164,7 +185,10 @@
 	  id (cdr (assq 'id frames)))
     (setq dir (concat dae-directory "anonymous/" id "/"))
     (dae-ensure-directory dir)
-    (setq process (dae-start-cdda dir cdrom))
+    (setq process
+	  (if paranoid
+	      (dae-start-cdda dir cdrom)
+	    (dae-start-paranoid dir cdrom)))
     (scan-sleeve dir)
     (list dir frames process toc)))
 
@@ -189,7 +213,7 @@
 	(dae-eject ,cdrom)))
     process))
 
-(defun dae-start-cdda (dir cdrom)
+(defun dae-start-paranoid (dir cdrom)
   (let* ((default-directory dir)
 	 (start-time (float-time (current-time)))
 	 process)
